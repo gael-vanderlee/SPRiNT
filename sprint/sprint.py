@@ -207,60 +207,61 @@ def SPRiNT_remove_outliers(fooof_chan, ts, opt):
     return fg
 
 
+if __name__ == '__main__':
 
-# Begin user-specific code
-os.chdir('/Users/lucwilson/Desktop')
-# Get data (others may not need, depending on data format)
-with open('sample_ts.csv') as csv_file:
-    csv_reader = csv.reader(csv_file, delimiter=',')
-    n = []
-    for row in csv_reader:
-        n.append(row)
+    # Begin user-specific code
+    os.chdir('/Users/lucwilson/Desktop')
+    # Get data (others may not need, depending on data format)
+    with open('sample_ts.csv') as csv_file:
+        csv_reader = csv.reader(csv_file, delimiter=',')
+        n = []
+        for row in csv_reader:
+            n.append(row)
 
-# Set hyperparameters
-opt = {
-    "sfreq": 200,  # Input sampling rate
-    "WinLength": 1,  # STFT window length
-    "WinOverlap": 50,  # Overlap between sliding windows (in %)
-    "WinAverage": 5, # Number of overlapping windows being averaged
-    "rmoutliers": 1, # Apply peak post-processing
-    "maxTime": 6, # Maximum distance of nearby peaks in time (in n windows)
-    "maxFreq": 2.5, # Maximum distance of nearby peaks in frequency (in Hz)
-    "minNear": 3, # Minimum number of similar peaks nearby (using above bounds)
-    }
+    # Set hyperparameters
+    opt = {
+        "sfreq": 200,  # Input sampling rate
+        "WinLength": 1,  # STFT window length
+        "WinOverlap": 50,  # Overlap between sliding windows (in %)
+        "WinAverage": 5, # Number of overlapping windows being averaged
+        "rmoutliers": 1, # Apply peak post-processing
+        "maxTime": 6, # Maximum distance of nearby peaks in time (in n windows)
+        "maxFreq": 2.5, # Maximum distance of nearby peaks in frequency (in Hz)
+        "minNear": 3, # Minimum number of similar peaks nearby (using above bounds)
+        }
 
-# generate numpy array for data
-if len(n) == 1:
-   # convert F into a numpy array
-    n = n[0]
-    n = [float(x) for x in n]
-    F = np.array(n)
-else:
-    n = [[float(x) for x in n[i]] for i in range(len(n))]
-    F = np.array(n)
+    # generate numpy array for data
+    if len(n) == 1:
+       # convert F into a numpy array
+        n = n[0]
+        n = [float(x) for x in n]
+        F = np.array(n)
+    else:
+        n = [[float(x) for x in n[i]] for i in range(len(n))]
+        F = np.array(n)
 
-# print(F)
-# F = F[0,0:2400]
+    # print(F)
+    # F = F[0,0:2400]
 
-# expects a numpy array
-output = SPRiNT_stft_py(F,opt)
+    # expects a numpy array
+    output = SPRiNT_stft_py(F,opt)
 
-# For architecture
-# print(output['ts'])
-# print(output['TF'].shape)
-# print(output['TF'][0,0,:])
+    # For architecture
+    # print(output['ts'])
+    # print(output['TF'].shape)
+    # print(output['TF'][0,0,:])
 
-# run fooof across channels and time
-# Only issue: Does not use previous window's exponent estimate, haven't seen
-# discrepancies yet (...)
-fg = fooof.FOOOFGroup(peak_width_limits=[2, 6],\
-    min_peak_height=0.5, max_n_peaks = 3)
-fgs = fooof.fit_fooof_3d(fg, output['freqs'], output['TF'], freq_range=[1, 40])
+    # run fooof across channels and time
+    # Only issue: Does not use previous window's exponent estimate, haven't seen
+    # discrepancies yet (...)
+    fg = fooof.FOOOFGroup(peak_width_limits=[2, 6],\
+        min_peak_height=0.5, max_n_peaks = 3)
+    fgs = fooof.fit_fooof_3d(fg, output['freqs'], output['TF'], freq_range=[1, 40])
 
-# before removing outliers
-print(fgs[0].get_params('peak_params'))
+    # before removing outliers
+    print(fgs[0].get_params('peak_params'))
 
-fgs = [SPRiNT_remove_outliers(fgs[i], output['ts'], opt) for i in range(2)]
+    fgs = [SPRiNT_remove_outliers(fgs[i], output['ts'], opt) for i in range(2)]
 
-# after removing outliers
-print(fgs[0].get_params('peak_params'))
+    # after removing outliers
+    print(fgs[0].get_params('peak_params'))
