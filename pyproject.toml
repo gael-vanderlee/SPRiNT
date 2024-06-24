@@ -1,0 +1,17 @@
+[tool.poetry]
+name = "sprint"
+version = "0.2.0"
+description = ""
+authors = ["Gvanderl <gael.vanderlee@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.10"
+numpy = "*"
+fooof = "*"
+matplotlib = "*"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
