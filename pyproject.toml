@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sprint"
-version = "0.2.0"
+version = "0.4.0"
 description = ""
 authors = ["Gvanderl <gael.vanderlee@gmail.com>"]
 readme = "README.md"
@@ -10,6 +10,7 @@ python = "^3.10"
 numpy = "*"
 fooof = "*"
 matplotlib = "*"
+tqdm = "*"
 
 
 [build-system]

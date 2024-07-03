@@ -14,11 +14,13 @@ from fooof.sim.gen import gen_periodic
 from fooof.sim.gen import gen_aperiodic
 from fooof.objs.utils import combine_fooofs
 from copy import deepcopy
+import matplotlib.pyplot as plt
+import matplotlib as mpl
+from tqdm import trange
 
 # F should be a nxm numpy array
 # where n is the number of channels, m is the number of samples
 # opt should be a dictionary
-
 def SPRiNT_stft_py(F, opt):
     ''' SPRiNT_stft_py: Compute a locally averaged short-time Fourier transform
     (for use in SPRiNT)
@@ -27,6 +29,14 @@ def SPRiNT_stft_py(F, opt):
     F - Time series (nxm numpy array),
     where n is number of channels, m is number of samples
     opt - Model settings/hyperparameters (dict)
+
+    Outputs
+    output - Dictionary containing:
+        TF - Short-time Fourier transform (channels x time windows x frequency bins),
+        p is number of frequency bins
+        freqs - Frequency bins (numpy array)
+        ts - Time bins (numpy array)
+
 
     Segments of this function were adapted from the Brainstorm software package:
     https://neuroimage.usc.edu/brainstorm
@@ -182,7 +192,7 @@ def SPRiNT_remove_outliers(fooof_chan, ts, opt):
         peaks_tmp = peaks_tmp[[not bln for bln in remove]]
 
     fg = list([])
-    for t in range(len(ts)):
+    for t in trange(len(ts), desc="Fitting FOOOF"):
         tmp = fooof_chan.get_fooof(t)
         if npeak_bytime_tmp[t] != npeak_bytime[t]:
             if npeak_bytime_tmp[t] == 0:
@@ -205,6 +215,67 @@ def SPRiNT_remove_outliers(fooof_chan, ts, opt):
         fg.append(tmp)
     fg = combine_fooofs(fg)
     return fg
+
+
+def plot_power_spectra_3d(channel_index, fgs=None, output=None, title=""):
+    """
+    Plot a single channel of a FOOOFGroup in 3D:frequencies vs time vs power
+    :param fgs: list of FOOOFGroup
+    :param channel_index: index of the channel to plot
+    :return: None
+    """
+    # Create a new matplotlib figure and an Axes3D subplot
+    fig = plt.figure(figsize=(10, 7))
+    ax = fig.add_subplot(111, projection='3d')
+    colormap = mpl.colormaps['viridis']
+
+    if fgs is not None:
+        power_spectra = fgs[channel_index].power_spectra
+        freqs = fgs[channel_index].freqs
+    elif output is not None:
+        freqs = output['freqs']
+        power_spectra = output['TF'][channel_index]
+    else:
+        raise ValueError("No FOOOFGroup or output dictionary provided.")
+
+    # Loop over each FOOOFResult in the FOOOFGroup
+    for i, result in enumerate(power_spectra):
+        # Should I reconstruct?
+        power_spectrum = power_spectra[i, :]
+
+        # Create the y-values (time window) and z-values (power)
+        time_window = [i] * len(power_spectrum)
+        power = power_spectrum
+        color = colormap(i / len(power_spectra))
+
+        # Plot the data
+        ax.plot(freqs, time_window, zs=power, zdir='z', color=color)
+
+    # Set the labels for the axes
+    ax.set_xlabel('Frequency (Hz)')
+    ax.set_ylabel('Time Window')
+    ax.set_zlabel('Power')
+    ax.set_title(title)
+
+    fig.show()
+
+
+def fit_fooof_3d(fg, freqs, power_spectra, freq_range=None, n_jobs=1, progress="tqdm"):
+    """
+    Copy pasted for progress bar
+    """
+
+    # Reshape 3d data to 2d and fit, in order to fit with a single group model object
+    shape = np.shape(power_spectra)
+    powers_2d = np.reshape(power_spectra, (shape[0] * shape[1], shape[2]))
+
+    fg.fit(freqs, powers_2d, freq_range, n_jobs, progress)
+
+    # Reorganize 2d results into a list of model group objects, to reflect original shape
+    fgs = [fg.get_group(range(dim_a * shape[1], (dim_a + 1) * shape[1])) \
+           for dim_a in range(shape[0])]
+
+    return fgs
 
 
 if __name__ == '__main__':
