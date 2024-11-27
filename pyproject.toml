@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "sprint"
-version = "0.4.0"
+version = "0.5.0"
 description = ""
 authors = ["Gvanderl <gael.vanderlee@gmail.com>"]
 readme = "README.md"
@@ -11,6 +11,7 @@ numpy = "*"
 fooof = "*"
 matplotlib = "*"
 tqdm = "*"
+plotly = "^5.24.1"
 
 
 [build-system]

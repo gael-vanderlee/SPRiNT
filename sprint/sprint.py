@@ -17,6 +17,8 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import matplotlib as mpl
 from tqdm import trange
+import plotly.graph_objects as go
+
 
 # F should be a nxm numpy array
 # where n is the number of channels, m is the number of samples
@@ -217,48 +219,81 @@ def SPRiNT_remove_outliers(fooof_chan, ts, opt):
     return fg
 
 
-def plot_power_spectra_3d(channel_index, fgs=None, output=None, title=""):
+
+def plot_power_spectra_3d(channel_index, fgs=None, output=None, title="", interactive=False):
     """
     Plot a single channel of a FOOOFGroup in 3D:frequencies vs time vs power
     :param fgs: list of FOOOFGroup
     :param channel_index: index of the channel to plot
-    :return: None
+    :param title: title of the plot
+    :param interactive: if True, return an interactive plotly figure
+    :return: None or plotly figure
     """
-    # Create a new matplotlib figure and an Axes3D subplot
-    fig = plt.figure(figsize=(10, 7))
-    ax = fig.add_subplot(111, projection='3d')
-    colormap = mpl.colormaps['viridis']
+    if interactive:
+        fig = go.Figure()
+        colormap = mpl.cm.get_cmap('viridis')
 
-    if fgs is not None:
-        power_spectra = fgs[channel_index].power_spectra
-        freqs = fgs[channel_index].freqs
-    elif output is not None:
-        freqs = output['freqs']
-        power_spectra = output['TF'][channel_index]
+        if fgs is not None:
+            power_spectra = fgs[channel_index].power_spectra
+            freqs = fgs[channel_index].freqs
+        elif output is not None:
+            freqs = output['freqs']
+            power_spectra = output['TF'][channel_index]
+        else:
+            raise ValueError("No FOOOFGroup or output dictionary provided.")
+
+        norm = mpl.colors.Normalize(vmin=0, vmax=len(power_spectra))
+
+        for i, power_spectrum in enumerate(power_spectra):
+            time_window = [i] * len(power_spectrum)
+            color = mpl.colors.to_hex(colormap(norm(i)))
+
+            fig.add_trace(go.Scatter3d(
+                x=freqs,
+                y=time_window,
+                z=power_spectrum,
+                mode='lines',
+                line=dict(color=color)
+            ))
+
+        fig.update_layout(
+            title=title,
+            scene=dict(
+                xaxis_title='Frequency (Hz)',
+                yaxis_title='Time Window',
+                zaxis_title='Power'
+            )
+        )
+
     else:
-        raise ValueError("No FOOOFGroup or output dictionary provided.")
+        fig = plt.figure(figsize=(10, 7))
+        ax = fig.add_subplot(111, projection='3d')
+        colormap = mpl.cm.get_cmap('viridis')
 
-    # Loop over each FOOOFResult in the FOOOFGroup
-    for i, result in enumerate(power_spectra):
-        # Should I reconstruct?
-        power_spectrum = power_spectra[i, :]
+        if fgs is not None:
+            power_spectra = fgs[channel_index].power_spectra
+            freqs = fgs[channel_index].freqs
+        elif output is not None:
+            freqs = output['freqs']
+            power_spectra = output['TF'][channel_index]
+        else:
+            raise ValueError("No FOOOFGroup or output dictionary provided.")
 
-        # Create the y-values (time window) and z-values (power)
-        time_window = [i] * len(power_spectrum)
-        power = power_spectrum
-        color = colormap(i / len(power_spectra))
+        norm = mpl.colors.Normalize(vmin=0, vmax=len(power_spectra))
 
-        # Plot the data
-        ax.plot(freqs, time_window, zs=power, zdir='z', color=color)
+        for i, power_spectrum in enumerate(power_spectra):
+            time_window = [i] * len(power_spectrum)
+            color = colormap(norm(i))
 
-    # Set the labels for the axes
-    ax.set_xlabel('Frequency (Hz)')
-    ax.set_ylabel('Time Window')
-    ax.set_zlabel('Power')
-    ax.set_title(title)
+            ax.plot(freqs, time_window, zs=power_spectrum, zdir='z', color=color)
+
+        ax.set_xlabel('Frequency (Hz)')
+        ax.set_ylabel('Time Window')
+        ax.set_zlabel('Power')
+        ax.set_title(title)
 
     fig.show()
-
+    return fig
 
 def fit_fooof_3d(fg, freqs, power_spectra, freq_range=None, n_jobs=1, progress="tqdm"):
     """
@@ -278,8 +313,7 @@ def fit_fooof_3d(fg, freqs, power_spectra, freq_range=None, n_jobs=1, progress="
     return fgs
 
 
-if __name__ == '__main__':
-
+def old_main():
     # Begin user-specific code
     os.chdir('/Users/lucwilson/Desktop')
     # Get data (others may not need, depending on data format)
@@ -336,3 +370,55 @@ if __name__ == '__main__':
 
     # after removing outliers
     print(fgs[0].get_params('peak_params'))
+
+
+def generate_eeg_signal(sampling_rate, frequencies, duration=1.0, num_channels=1):
+    """
+    Generate a numpy array of combined sinusoids for the given frequencies at the specified sampling rate.
+
+    :param sampling_rate: Sampling rate in Hz
+    :param frequencies: List of tuples (frequency, power) in Hz and arbitrary units
+    :param duration: Duration of the signal in seconds (default is 1.0 second)
+    :param num_channels: Number of channels (default is 1)
+    :return: Numpy array of shape (num_channels, num_samples) with the combined sinusoids
+    """
+    t = np.linspace(0, duration, int(sampling_rate * duration), endpoint=False)
+    signal = np.zeros((num_channels, len(t)))
+
+    for freq, power in frequencies:
+        for channel in range(num_channels):
+            signal[channel] += power * np.sin(2 * np.pi * freq * t)
+
+    return signal
+
+if __name__ == '__main__':
+
+    # Create a fake signal
+    signal1 = generate_eeg_signal(128, [(10, 1)], duration=30)
+    signal2 = generate_eeg_signal(128, [(20, 1)], duration=30)
+    fake_eeg = np.concatenate((signal1, signal2), axis=1)
+    # plt.plot(fake_eeg[0])
+    # plt.show()
+    # Set hyperparameters
+    opt = {
+        "sfreq": 128,  # Input sampling rate
+        "WinLength": 1,  # STFT window length
+        "WinOverlap": 50,  # Overlap between sliding windows (in %)
+        "WinAverage": 5, # Number of overlapping windows being averaged
+        "rmoutliers": 1, # Apply peak post-processing
+        "maxTime": 6, # Maximum distance of nearby peaks in time (in n windows)
+        "maxFreq": 2.5, # Maximum distance of nearby peaks in frequency (in Hz)
+        "minNear": 3, # Minimum number of similar peaks nearby (using above bounds)
+        }    # Plot power spectra
+    output = SPRiNT_stft_py(fake_eeg, opt)
+    fg = fooof.FOOOFGroup(
+        peak_width_limits=[2, 6], min_peak_height=0.5, max_n_peaks=3
+    )
+    fgs = fit_fooof_3d(  # Returns n_channels fooof groups, each one has n_time_windows parameters
+        fg, output["freqs"], output["TF"], freq_range=[1, 40], n_jobs=-1
+    )
+    fig = plot_power_spectra_3d(0, fgs=fgs, interactive=True)
+    fig.show()
+    # plt.show()
+    # plot_power_spectra_3d(0, fgs=fgs, title="Power Spectra", interactive=True)
+    # plot_power_spectra_3d(0, output=output, title="Power Spectra", interactive=True)
